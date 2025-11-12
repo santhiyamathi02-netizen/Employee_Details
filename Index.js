@@ -10,7 +10,8 @@ const db = mysql.createConnection({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+    database: process.env.DB_NAME,
+    dateStrings: true
 });
 
 db.connect((err) => {
@@ -25,36 +26,82 @@ app.get("/employees", (req, res) => {
     });
 });
 
-
 app.get("/employees/:id", (req, res) => {
-    db.query("SELECT * FROM employees WHERE id=?", [req.params.id], (err, result) => {
-        if (err) return res.status(500).send(err);
-        res.json(result[0]);
+    const empId = req.params.id;
+
+    db.query("SELECT * FROM employees WHERE id=?", [empId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "Database error", error: err });
+        }
+        if (result.length === 0) {
+            return res.status(404).json({ message: `Employee with ID ${empId} not found` });
+        }
+        res.status(200).json(result[0]);
     });
 });
 
 app.post("/employees", (req, res) => {
     const { name, dob, joining_date, salary_year } = req.body;
+
+    if (!name || !dob || !joining_date || !salary_year) {
+        return res.status(400).json({ message: "All fields (name, dob, joining_date, salary_year) are required." });
+    }
+
     const sql = "INSERT INTO employees (name, dob, joining_date, salary_year) VALUES (?,?,?,?)";
-    db.query(sql, [name, dob, joining_date, salary_year], (err) => {
-        if (err) return res.status(500).send(err);
-        res.send("Employee Added Successfully!");
+    db.query(sql, [name, dob, joining_date, salary_year], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: "Database error", error: err });
+        }
+
+        res.status(201).json({ message: "Employee Added Successfully!", insertedId: result.insertId });
     });
 });
 
 app.put("/employees/:id", (req, res) => {
+    const empId = req.params.id;
+
+    if (isNaN(empId)) {
+        return res.status(400).json({ 
+            message: "Invalid employee ID — must be a number." 
+        });
+    }
+
     const { name, dob, joining_date, salary_year } = req.body;
     const sql = "UPDATE employees SET name=?, dob=?, joining_date=?, salary_year=? WHERE id=?";
-    db.query(sql, [name, dob, joining_date, salary_year, req.params.id], (err) => {
-        if (err) return res.status(500).send(err);
-        res.send("Employee Updated Successfully!");
+    
+    db.query(sql, [name, dob, joining_date, salary_year, empId], (err, result) => {
+        if (err) return res.status(500).json({ message: "Database error", error: err });
+        if (result.affectedRows === 0) return res.status(404).json({ message: `Employee with ID ${empId} not found` });
+        res.json({ message: "Employee Updated Successfully!" });
     });
 });
 
+
 app.delete("/employees/:id", (req, res) => {
-    db.query("DELETE FROM employees WHERE id=?", [req.params.id], (err) => {
-        if (err) return res.status(500).send(err);
-        res.send("Employee Deleted Successfully!");
+    const empId = req.params.id;
+    if (isNaN(empId)) {
+        return res.status(400).json({ 
+            message: "Invalid employee ID — must be a number." 
+        });
+    }
+
+    db.query("DELETE FROM employees WHERE id=?", [empId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ 
+                message: "Database error", 
+                error: err 
+            });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ 
+                message: `Employee with ID ${empId} not found` 
+            });
+        }
+
+        res.json({ 
+            message: "Employee Deleted Successfully!" 
+        });
     });
 });
 
