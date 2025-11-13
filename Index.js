@@ -14,6 +14,14 @@ const db = mysql.createConnection({
     dateStrings: true
 });
 
+const ERROR_CODES = {
+    INVALID_ID: 4001,
+    MISSING_FIELDS: 4002,
+    INVALID_FIELD_TYPE: 4003,
+    DATABASE_ERROR: 5001,
+    EMPLOYEE_NOT_FOUND: 4041
+};
+
 db.connect((err) => {
     if (err) console.log("DB Connect Failed:", err);
     else console.log("DB Connected Successfully!");
@@ -31,10 +39,15 @@ app.get("/employees/:id", (req, res) => {
 
     db.query("SELECT * FROM employees WHERE id=?", [empId], (err, result) => {
         if (err) {
-            return res.status(500).json({ message: "Database error", error: err });
+            return res.status(500).json({ 
+                CODE: ERROR_CODES.DATABASE_ERROR,
+                message: "Database error", 
+                error: err });
         }
         if (result.length === 0) {
-            return res.status(404).json({ message: `Employee with ID ${empId} not found` });
+            return res.status(404).json({ 
+                CODE: ERROR_CODES.EMPLOYEE_NOT_FOUND,
+                message: `Employee with ID ${empId} not found` });
         }
         res.status(200).json(result[0]);
     });
@@ -44,9 +57,17 @@ app.post("/employees", (req, res) => {
     const { name, dob, joining_date, salary_year } = req.body;
 
     if (!name || !dob || !joining_date || !salary_year) {
-        return res.status(400).json({ message: "All fields (name, dob, joining_date, salary_year) are required." });
+        return res.status(400).json({ 
+            code: ERROR_CODES.MISSING_FIELDS, 
+            message: "All fields (name, dob, joining_date, salary_year) are required." });
     }
 
+     if (typeof name !== "string" || isNaN(Date.parse(dob)) || isNaN(Date.parse(joining_date)) || isNaN(salary_year)) {
+        return res.status(400).json({
+            code: ERROR_CODES.INVALID_FIELD_TYPE,
+            message: "Invalid data type for one or more fields."
+        });
+    }
     const sql = "INSERT INTO employees (name, dob, joining_date, salary_year) VALUES (?,?,?,?)";
     db.query(sql, [name, dob, joining_date, salary_year], (err, result) => {
         if (err) {
@@ -62,15 +83,28 @@ app.put("/employees/:id", (req, res) => {
 
     if (isNaN(empId)) {
         return res.status(400).json({ 
+            code: ERROR_CODES.INVALID_ID,
             message: "Invalid employee ID — must be a number." 
         });
     }
 
     const { name, dob, joining_date, salary_year } = req.body;
-    const sql = "UPDATE employees SET name=?, dob=?, joining_date=?, salary_year=? WHERE id=?";
+    if (!name || !dob || !joining_date || !salary_year) {return res.status(400).json({ code: ERROR_CODES.MISSING_FIELDS,
+        MESSAGE: "ALL FIELDS (NAME, DOB, JOINING_DATE, SALARY_YEAR) ARE REQUIRED"
+    });
+}
+if (typeof name !== "string" || isNaN(Date.parse(dob)) || isNaN(Date.parse(joining_date)) || isNaN(salary_year)) {
+        return res.status(400).json({
+            code: ERROR_CODES.INVALID_FIELD_TYPE,
+            message: "Invalid data type for one or more fields."
+        });
+    }
+ const sql = "UPDATE employees SET name=?, dob=?, joining_date=?, salary_year=? WHERE id=?";
     
     db.query(sql, [name, dob, joining_date, salary_year, empId], (err, result) => {
-        if (err) return res.status(500).json({ message: "Database error", error: err });
+        if (err) return res.status(500).json({ 
+            CODE: ERROR_CODES.DATABASE_ERROR,
+            message: "Database error while updating employees.", error: err });
         if (result.affectedRows === 0) return res.status(404).json({ message: `Employee with ID ${empId} not found` });
         res.json({ message: "Employee Updated Successfully!" });
     });
@@ -81,24 +115,24 @@ app.delete("/employees/:id", (req, res) => {
     const empId = req.params.id;
     if (isNaN(empId)) {
         return res.status(400).json({ 
+            code: ERROR_CODES.invalid_id,
             message: "Invalid employee ID — must be a number." 
         });
     }
-
     db.query("DELETE FROM employees WHERE id=?", [empId], (err, result) => {
         if (err) {
             return res.status(500).json({ 
+                code: ERROR_CODES.DATABASE_ERROR,
                 message: "Database error", 
                 error: err 
             });
         }
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ 
-                message: `Employee with ID ${empId} not found` 
-            });
-        }
-
+         if ( result.affectedRows ===0)
+        {return res.status(404).json({
+            code: ERROR_CODES.EMPLOYEE_NOT_FOUND,
+            message: "Employee with ID ${empId} not found"
+        });
+    } 
         res.json({ 
             message: "Employee Deleted Successfully!" 
         });
