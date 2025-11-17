@@ -15,11 +15,11 @@ const db = mysql.createConnection({
 });
 
 const ERROR_CODES = {
-    INVALID_ID: 4001,
-    MISSING_FIELDS: 4002,
-    INVALID_FIELD_TYPE: 4003,
-    DATABASE_ERROR: 5001,
-    EMPLOYEE_NOT_FOUND: 4041
+    INVALID_ID: 400,
+    MISSING_FIELDS: 400,
+    INVALID_FIELD_TYPE: 400,
+    DATABASE_ERROR: 500,
+    EMPLOYEE_NOT_FOUND: 404
 };
 
 db.connect((err) => {
